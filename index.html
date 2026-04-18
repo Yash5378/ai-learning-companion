@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Yash — AI Learning Companion</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0a0c10;--surface:#111318;--surface2:#1a1d24;--surface3:#22262f;
+  --border:#2a2e38;--amber:#f59e0b;--amber2:#fbbf24;--amber-dim:rgba(245,158,11,0.12);
+  --amber-glow:rgba(245,158,11,0.06);--teal:#14b8a6;--teal-dim:rgba(20,184,166,0.12);
+  --blue:#3b82f6;--blue-dim:rgba(59,130,246,0.12);--green:#22c55e;
+  --green-dim:rgba(34,197,94,0.12);--red:#ef4444;--red-dim:rgba(239,68,68,0.12);
+  --purple:#a855f7;--purple-dim:rgba(168,85,247,0.12);--coral:#f97316;
+  --coral-dim:rgba(249,115,22,0.12);--text:#e8eaf0;--text2:#9ca3af;--text3:#6b7280;
+  --mono:'Space Mono',monospace;--sans:'DM Sans',sans-serif;--r:10px;--r-sm:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
+a{color:var(--amber);text-decoration:none}a:hover{text-decoration:underline}
+button{cursor:pointer;border:none;outline:none;font-family:var(--sans)}
+input,textarea,select{font-family:var(--sans)}
+
+/* Layout */
+.app{display:flex;flex-direction:column;min-height:100vh;max-width:1000px;margin:0 auto;padding:16px}
+.topbar{display:flex;align-items:center;gap:12px;padding:12px 18px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:14px}
+.logo{font-family:var(--mono);font-size:13px;color:var(--amber);font-weight:700;white-space:nowrap}
+.logo span{color:var(--text3);font-weight:400}
+.topbar-right{display:flex;align-items:center;gap:16px;margin-left:auto}
+.tstat{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);font-family:var(--mono)}
+.tstat .val{color:var(--text);font-weight:700}
+.sync-badge{display:flex;align-items:center;gap:5px;font-size:11px;padding:3px 10px;border-radius:20px;font-family:var(--mono);cursor:pointer}
+.sync-badge.synced{background:var(--green-dim);color:var(--green)}
+.sync-badge.syncing{background:var(--amber-dim);color:var(--amber)}
+.sync-badge.offline{background:var(--red-dim);color:var(--red)}
+.sync-badge.noauth{background:var(--surface2);color:var(--text3);border:1px solid var(--border)}
+
+.nav{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:6px;margin-bottom:14px;overflow-x:auto}
+.nav-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 12px;border-radius:var(--r-sm);font-size:13px;font-weight:500;color:var(--text2);background:none;transition:all 0.15s;white-space:nowrap}
+.nav-btn:hover{color:var(--text);background:var(--surface2)}
+.nav-btn.active{color:var(--amber);background:var(--amber-dim)}
+
+.panel{display:none;animation:fadeIn 0.2s ease}.panel.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px}
+.card-sm{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+
+.sh{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;font-family:var(--mono)}
+.section-title{font-size:20px;font-weight:600;margin-bottom:4px}
+.section-sub{font-size:13px;color:var(--text2);margin-bottom:18px}
+
+.pbar-wrap{background:var(--surface3);border-radius:4px;height:6px;overflow:hidden}
+.pbar-fill{height:100%;border-radius:4px;transition:width 0.5s ease}
+
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;font-family:var(--mono)}
+.badge-green{background:var(--green-dim);color:var(--green)}
+.badge-amber{background:var(--amber-dim);color:var(--amber)}
+.badge-blue{background:var(--blue-dim);color:var(--blue)}
+
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:var(--r-sm);font-size:13px;font-weight:600;transition:all .15s}
+.btn-amber{background:var(--amber);color:#0a0c10}.btn-amber:hover{background:var(--amber2)}
+.btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border)}.btn-ghost:hover{background:var(--surface3)}
+.btn-green{background:var(--green-dim);color:var(--green);border:1px solid rgba(34,197,94,.25)}.btn-green:hover{background:rgba(34,197,94,.2)}
+.btn-red{background:var(--red-dim);color:var(--red);border:1px solid rgba(239,68,68,.25)}.btn-red:hover{background:rgba(239,68,68,.2)}
+.btn-blue{background:var(--blue-dim);color:var(--blue);border:1px solid rgba(59,130,246,.25)}.btn-blue:hover{background:rgba(59,130,246,.2)}
+.btn-sm{padding:6px 12px;font-size:12px}
+
+.check-item{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer}
+.check-item:last-child{border-bottom:none}
+.check-item:hover{background:var(--amber-glow);margin:0 -16px;padding:8px 16px;border-radius:4px}
+.check-box{width:18px;height:18px;border-radius:4px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;transition:all .15s}
+.check-box.done{background:var(--green);border-color:var(--green)}.check-box.done::after{content:'✓';font-size:11px;color:#fff;font-weight:700}
+.check-box.learning{background:var(--amber-dim);border-color:var(--amber)}.check-box.learning::after{content:'◐';font-size:11px;color:var(--amber)}
+.check-label{font-size:13px;color:var(--text2);line-height:1.5;flex:1}
+.check-label.done{color:var(--text3);text-decoration:line-through}
+
+.phase-card{border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:12px}
+.phase-header{display:flex;align-items:center;gap:14px;padding:14px 18px;cursor:pointer;background:var(--surface)}
+.phase-header:hover{background:var(--surface2)}
+.phase-num{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:14px;flex-shrink:0}
+.phase-meta{flex:1}
+.phase-name{font-size:14px;font-weight:600}
+.phase-dur{font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:2px}
+.phase-body{display:none;padding:16px;background:var(--surface2);border-top:1px solid var(--border)}
+.phase-body.open{display:block}
+.chevron{font-size:12px;color:var(--text3);transition:transform .2s}
+.chevron.open{transform:rotate(180deg)}
+
+.fc-scene{perspective:1000px;width:100%;height:230px;cursor:pointer;margin:14px 0}
+.fc-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .5s ease}
+.fc-inner.flipped{transform:rotateY(180deg)}
+.fc-face{position:absolute;inset:0;border-radius:var(--r);border:1px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:26px;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.fc-front{background:var(--surface)}.fc-back{background:var(--surface2);transform:rotateY(180deg)}
+.fc-tag{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;font-family:var(--mono);margin-bottom:12px}
+.fc-question{font-size:17px;font-weight:600;color:var(--text);text-align:center;line-height:1.5}
+.fc-answer{font-size:13px;color:var(--text2);text-align:center;line-height:1.6}
+.fc-hint{font-size:11px;color:var(--text3);margin-top:14px;font-family:var(--mono)}
+.fc-counter{font-family:var(--mono);font-size:12px;color:var(--text3);text-align:center;margin-bottom:6px}
+.fc-actions{display:flex;gap:10px;justify-content:center;margin-top:8px}
+.fc-progress-row{display:flex;gap:3px;margin-bottom:14px}
+.fc-pip{flex:1;height:3px;background:var(--surface3);border-radius:2px}
+.fc-pip.seen{background:var(--text3)}.fc-pip.mastered{background:var(--green)}
+.fc-cat-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.fc-cat{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;background:var(--surface2);border:1px solid var(--border);color:var(--text2)}
+.fc-cat.active{background:var(--amber-dim);border-color:rgba(245,158,11,.3);color:var(--amber)}
+
+.proj-card{border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:12px}
+.proj-header{display:flex;align-items:flex-start;gap:14px;padding:14px 18px;background:var(--surface);cursor:pointer}
+.proj-header:hover{background:var(--surface2)}
+.proj-num-box{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:14px;flex-shrink:0}
+.proj-info{flex:1}
+.proj-name{font-size:14px;font-weight:600;margin-bottom:3px}
+.proj-stack{font-size:11px;color:var(--text3);font-family:var(--mono)}
+.proj-body{display:none;padding:16px;background:var(--surface2);border-top:1px solid var(--border)}
+.proj-body.open{display:block}
+.proj-task{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);cursor:pointer}
+.proj-task:last-child{border-bottom:none}
+.proj-task-label{font-size:13px;color:var(--text2);flex:1}
+.proj-task-label.done{color:var(--text3);text-decoration:line-through}
+
+.timer-ring-wrap{position:relative;width:190px;height:190px;margin:0 auto 22px}
+.timer-ring-wrap svg{position:absolute;inset:0;transform:rotate(-90deg)}
+.timer-ring-bg{fill:none;stroke:var(--surface3);stroke-width:8}
+.timer-ring-prog{fill:none;stroke-width:8;stroke-linecap:round;transition:stroke-dashoffset 1s linear}
+.timer-time{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.timer-digits{font-family:var(--mono);font-size:40px;font-weight:700;letter-spacing:2px}
+.timer-mode-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;font-family:var(--mono);margin-top:4px}
+.timer-mode-btn{padding:6px 16px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text2)}
+.timer-mode-btn.active{background:var(--amber-dim);border-color:rgba(245,158,11,.3);color:var(--amber)}
+
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px}
+.stat-value{font-family:var(--mono);font-size:30px;font-weight:700;margin-bottom:4px}
+.stat-label{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;font-family:var(--mono)}
+
+.mini-phase{border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 12px;background:var(--surface2);cursor:pointer;transition:border-color .15s}
+.mini-phase:hover{border-color:var(--amber)}
+.mini-phase-name{font-size:12px;font-weight:600;color:var(--text2);margin-bottom:7px}
+.mini-phase-pct{font-family:var(--mono);font-size:11px;color:var(--text3);margin-top:5px}
+
+.tip-box{background:var(--amber-glow);border:1px solid rgba(245,158,11,.2);border-radius:var(--r-sm);padding:12px 14px;font-size:13px;color:var(--text2);line-height:1.6}
+.tip-box strong{color:var(--amber)}
+
+.xp-wrap{background:var(--surface3);border-radius:8px;height:10px;overflow:hidden;margin:6px 0}
+.xp-fill{height:100%;border-radius:8px;background:linear-gradient(90deg,var(--amber),var(--amber2));transition:width .6s ease}
+
+.notes-area{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px;color:var(--text);font-size:13px;line-height:1.7;resize:vertical;min-height:140px}
+.notes-area:focus{outline:none;border-color:var(--amber)}
+
+.res-link{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.res-link:last-child{border-bottom:none}
+.res-phase-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.res-link a{color:var(--text2)}.res-link a:hover{color:var(--amber)}
+.res-cost{font-size:11px;font-family:var(--mono);margin-left:auto;white-space:nowrap}
+
+/* ── Auth / Setup Modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(4px)}
+.modal-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:32px;width:100%;max-width:440px;margin:20px}
+.modal-title{font-size:20px;font-weight:600;margin-bottom:6px}
+.modal-sub{font-size:13px;color:var(--text2);margin-bottom:24px;line-height:1.6}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--text3);font-family:var(--mono);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em}
+.field input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 12px;color:var(--text);font-size:13px}
+.field input:focus{outline:none;border-color:var(--amber)}
+.field small{font-size:11px;color:var(--text3);margin-top:4px;display:block}
+.modal-actions{display:flex;gap:10px;margin-top:20px}
+.modal-tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:20px}
+.modal-tab{padding:8px 16px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.modal-tab.active{color:var(--amber);border-bottom-color:var(--amber)}
+.err-msg{background:var(--red-dim);border:1px solid rgba(239,68,68,.25);border-radius:var(--r-sm);padding:10px 12px;font-size:13px;color:var(--red);margin-top:12px}
+.ok-msg{background:var(--green-dim);border:1px solid rgba(34,197,94,.25);border-radius:var(--r-sm);padding:10px 12px;font-size:13px;color:var(--green);margin-top:12px}
+.step-guide{background:var(--surface2);border-radius:var(--r-sm);padding:14px;margin-bottom:20px;font-size:12px;color:var(--text2);line-height:1.8}
+.step-guide a{color:var(--amber)}
+.step-guide code{background:var(--surface3);padding:1px 5px;border-radius:3px;font-family:var(--mono);font-size:11px;color:var(--amber2)}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+@media(max-width:620px){.grid2,.grid3{grid-template-columns:1fr}.topbar-stats{display:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="logo">YASH<span>.ai</span> // LEARNING_OS</div>
+    <div class="topbar-right">
+      <div class="tstat"><span>🔥</span><span class="val" id="tb-streak">0</span></div>
+      <div class="tstat"><span>⚡</span><span class="val" id="tb-xp">0</span> XP</div>
+      <div class="tstat"><span>⏱</span><span class="val" id="tb-hrs">0</span>h</div>
+      <div class="sync-badge noauth" id="sync-badge" onclick="openAuthModal()" title="Click to sync across devices">☁ Sign in to sync</div>
+    </div>
+  </div>
+
+  <div class="nav">
+    <button class="nav-btn active" onclick="showPanel('home',this)">🏠 Dashboard</button>
+    <button class="nav-btn" onclick="showPanel('learn',this)">📚 Learn</button>
+    <button class="nav-btn" onclick="showPanel('flash',this)">🃏 Flashcards</button>
+    <button class="nav-btn" onclick="showPanel('proj',this)">🛠 Projects</button>
+    <button class="nav-btn" onclick="showPanel('timer',this)">⏱ Timer</button>
+    <button class="nav-btn" onclick="showPanel('res',this)">🔗 Resources</button>
+  </div>
+
+  <!-- HOME -->
+  <div id="panel-home" class="panel active">
+    <div class="grid2" style="margin-bottom:12px">
+      <div class="stat-card"><div class="stat-value" id="home-streak" style="color:var(--amber)">0</div><div class="stat-label">🔥 Day streak</div></div>
+      <div class="stat-card"><div class="stat-value" id="home-xp" style="color:var(--teal)">0</div><div class="stat-label">⚡ Total XP</div></div>
+      <div class="stat-card"><div class="stat-value" id="home-topics" style="color:var(--green)">0</div><div class="stat-label">✅ Topics done</div></div>
+      <div class="stat-card"><div class="stat-value" id="home-hrs" style="color:var(--purple)">0</div><div class="stat-label">⏱ Study hours</div></div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <div class="sh">Overall Progress</div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+        <div style="flex:1"><div class="xp-wrap"><div class="xp-fill" id="home-overall-bar" style="width:0%"></div></div></div>
+        <div style="font-family:var(--mono);font-size:13px;color:var(--amber)" id="home-overall-pct">0%</div>
+      </div>
+      <div class="sh" style="margin-bottom:8px">Phase breakdown</div>
+      <div class="grid3" id="home-phase-mini"></div>
+    </div>
+    <div class="grid2" style="margin-bottom:12px">
+      <div class="card"><div class="sh">Today's Focus</div><div id="home-focus" style="font-size:13px;color:var(--text2);line-height:1.7"></div></div>
+      <div class="card">
+        <div class="sh">Daily Notes</div>
+        <textarea class="notes-area" id="notes-ta" placeholder="What did you learn today?..." oninput="saveNotes()"></textarea>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;font-family:var(--mono)" id="notes-saved"></div>
+      </div>
+    </div>
+    <div class="tip-box"><strong>💡 Tip:</strong> <span id="home-tip"></span></div>
+  </div>
+
+  <!-- LEARN -->
+  <div id="panel-learn" class="panel">
+    <div class="section-title">Learning Phases</div>
+    <div class="section-sub">Click a topic to cycle: Todo → In Progress → Done (+10 XP)</div>
+    <div id="phases-container"></div>
+  </div>
+
+  <!-- FLASHCARDS -->
+  <div id="panel-flash" class="panel">
+    <div class="section-title">Flashcards</div>
+    <div class="section-sub">Click card to flip. Rate to track mastery.</div>
+    <div class="fc-cat-row" id="fc-cats"></div>
+    <div class="fc-progress-row" id="fc-progress-row"></div>
+    <div class="fc-counter" id="fc-counter"></div>
+    <div class="fc-scene" onclick="flipCard()">
+      <div class="fc-inner" id="fc-inner">
+        <div class="fc-face fc-front"><div class="fc-tag" id="fc-tag"></div><div class="fc-question" id="fc-q"></div><div class="fc-hint">tap to flip</div></div>
+        <div class="fc-face fc-back"><div class="fc-tag" id="fc-tag2"></div><div class="fc-answer" id="fc-a"></div><div class="fc-hint">rate to continue</div></div>
+      </div>
+    </div>
+    <div class="fc-actions" id="fc-actions" style="display:none">
+      <button class="btn btn-red" onclick="rateCard('again')">↩ Again</button>
+      <button class="btn btn-blue" onclick="rateCard('good')">👍 Good</button>
+      <button class="btn btn-green" onclick="rateCard('easy')">⭐ Easy</button>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:12px">
+      <button class="btn btn-ghost btn-sm" onclick="prevCard()">← Prev</button>
+      <button class="btn btn-ghost btn-sm" onclick="shuffleCards()">🔀 Shuffle</button>
+      <button class="btn btn-ghost btn-sm" onclick="nextCard()">Next →</button>
+    </div>
+    <div class="grid3" style="margin-top:18px">
+      <div class="card-sm" style="text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--green)" id="fc-stat-master">0</div><div style="font-size:11px;color:var(--text3);font-family:var(--mono)">Mastered</div></div>
+      <div class="card-sm" style="text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--blue)" id="fc-stat-good">0</div><div style="font-size:11px;color:var(--text3);font-family:var(--mono)">Good</div></div>
+      <div class="card-sm" style="text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--red)" id="fc-stat-again">0</div><div style="font-size:11px;color:var(--text3);font-family:var(--mono)">Review</div></div>
+    </div>
+  </div>
+
+  <!-- PROJECTS -->
+  <div id="panel-proj" class="panel">
+    <div class="section-title">Project Tracker</div>
+    <div class="section-sub">Build these 6 projects in order. Each one builds on the last.</div>
+    <div id="proj-container"></div>
+  </div>
+
+  <!-- TIMER -->
+  <div id="panel-timer" class="panel">
+    <div class="section-title">Study Timer</div>
+    <div class="section-sub">Pomodoro: 25 min focus → 5 min break. 4 sessions = long break.</div>
+    <div style="display:flex;gap:8px;justify-content:center;margin-bottom:22px">
+      <button class="timer-mode-btn active" onclick="setTimerMode('focus',this)">🎯 Focus 25m</button>
+      <button class="timer-mode-btn" onclick="setTimerMode('short',this)">☕ Short 5m</button>
+      <button class="timer-mode-btn" onclick="setTimerMode('long',this)">🛌 Long 15m</button>
+    </div>
+    <div style="text-align:center;padding:20px 0">
+      <div class="timer-ring-wrap">
+        <svg viewBox="0 0 100 100" width="190" height="190">
+          <circle class="timer-ring-bg" cx="50" cy="50" r="42"/>
+          <circle class="timer-ring-prog" id="timer-ring" cx="50" cy="50" r="42" stroke="var(--amber)" stroke-dasharray="263.9" stroke-dashoffset="0"/>
+        </svg>
+        <div class="timer-time">
+          <div class="timer-digits" id="timer-digits">25:00</div>
+          <div class="timer-mode-lbl" id="timer-mode-label">FOCUS</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button class="btn btn-ghost" onclick="resetTimer()">↺ Reset</button>
+        <button class="btn btn-amber" id="timer-start-btn" onclick="toggleTimer()">▶ Start</button>
+        <button class="btn btn-ghost" onclick="skipTimer()">⏭ Skip</button>
+      </div>
+      <div style="font-family:var(--mono);font-size:12px;color:var(--text3);margin-top:14px">Sessions: <span id="timer-sessions">0</span>/4</div>
+    </div>
+    <div class="grid2">
+      <div class="card-sm">
+        <div class="sh">Studying</div>
+        <select id="timer-topic-select" style="background:var(--surface3);border:1px solid var(--border);border-radius:var(--r-sm);padding:8px 10px;color:var(--text);font-size:13px;width:100%;font-family:var(--sans)"></select>
+      </div>
+      <div class="card-sm">
+        <div class="sh">Session log</div>
+        <div id="timer-log" style="font-size:12px;color:var(--text2);font-family:var(--mono);max-height:90px;overflow-y:auto;line-height:1.9"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESOURCES -->
+  <div id="panel-res" class="panel">
+    <div class="section-title">Resource Library</div>
+    <div class="section-sub">All curated links organized by phase.</div>
+    <div id="res-container"></div>
+  </div>
+</div>
+
+<!-- AUTH MODAL -->
+<div class="modal-overlay" id="auth-modal" style="display:none">
+  <div class="modal-box">
+    <div class="modal-title" id="modal-title">☁ Sync Your Progress</div>
+    <div class="modal-sub" id="modal-sub">Sign in to access your progress from any device — office, home, phone.</div>
+
+    <!-- Step 1: Setup (if no config) -->
+    <div id="step-setup">
+      <div class="step-guide">
+        <strong style="color:var(--amber)">One-time setup (5 min):</strong><br>
+        1. Go to <a href="https://supabase.com" target="_blank">supabase.com</a> → New project (free)<br>
+        2. Settings → API → copy <code>Project URL</code> and <code>anon public</code> key<br>
+        3. SQL Editor → run the setup SQL (see deployment guide)
+      </div>
+      <div class="field"><label>Supabase Project URL</label><input type="url" id="sb-url" placeholder="https://xxxxx.supabase.co"><small>Found in: Settings → API → Project URL</small></div>
+      <div class="field"><label>Supabase Anon Key</label><input type="text" id="sb-key" placeholder="eyJhbGciOiJIUzI1NiIs..."><small>Found in: Settings → API → Project API Keys → anon public</small></div>
+      <div class="modal-actions">
+        <button class="btn btn-amber" onclick="saveConfig()">Connect →</button>
+        <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Login/Register -->
+    <div id="step-auth" style="display:none">
+      <div class="modal-tabs">
+        <div class="modal-tab active" onclick="switchTab('login',this)">Sign In</div>
+        <div class="modal-tab" onclick="switchTab('register',this)">Create Account</div>
+      </div>
+      <div class="field"><label>Email</label><input type="email" id="auth-email" placeholder="yash@example.com"></div>
+      <div class="field"><label>Password</label><input type="password" id="auth-pass" placeholder="Min 6 characters"></div>
+      <div id="auth-msg"></div>
+      <div class="modal-actions">
+        <button class="btn btn-amber" id="auth-btn" onclick="doAuth()">Sign In</button>
+        <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      </div>
+      <div style="margin-top:14px;font-size:12px;color:var(--text3)">
+        <span onclick="resetConfig()" style="cursor:pointer;text-decoration:underline">Reset Supabase config</span>
+      </div>
+    </div>
+
+    <!-- Step 3: Logged in -->
+    <div id="step-loggedin" style="display:none">
+      <div class="ok-msg" id="loggedin-email">✓ Syncing as you@email.com</div>
+      <div style="margin-top:16px;font-size:13px;color:var(--text2)">Your progress syncs automatically across all devices. Just open this URL on any device and sign in.</div>
+      <div class="modal-actions" style="margin-top:20px">
+        <button class="btn btn-ghost" onclick="closeModal()">Close</button>
+        <button class="btn btn-red btn-sm" onclick="doSignOut()">Sign Out</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════
+// DATA
+// ═══════════════════════════════════
+const PHASES=[{id:1,name:'Python & ML Foundations',dur:'Month 1–2',color:'#3b82f6',topics:['NumPy: array ops, broadcasting, vectorized computation','Pandas: DataFrames, data cleaning, EDA on real datasets','Matplotlib / Seaborn: plotting training curves & metrics','ML fundamentals: train/val/test split, overfitting, cross-val','Scikit-learn: fit/predict API, pipelines, evaluation metrics','PyTorch: tensors, autograd, training loops, GPU support','Neural networks: layers, activations (ReLU, GELU, Softmax)','Backpropagation and gradient descent intuition','Optimizers: SGD, Adam, AdamW — differences and when to use','DataLoader, batching, mini-batch training patterns','fast.ai Part 1 — complete all lessons','Build and train a text sentiment classifier in PyTorch from scratch']},{id:2,name:'LangChain Core + RAG',dur:'Month 3–4',color:'#14b8a6',topics:['OpenAI API: chat completions, streaming, function calling, costs','Anthropic Claude API: messages API, tool use, 200K context','Ollama: run Llama/Mistral/Phi locally — free development testing','Prompt engineering: zero-shot, few-shot, chain-of-thought','PromptTemplate and ChatPromptTemplate in LangChain','Output parsers: PydanticOutputParser, JSON mode','LCEL: pipe operator, RunnablePassthrough, RunnableParallel','Document loaders: PDF, Web, CSV, Directory loaders','Text splitters: RecursiveCharacterTextSplitter, chunk tuning','Embeddings: OpenAI text-embedding-3-small, sentence-transformers','Vector DBs: pgvector (PostgreSQL), Pinecone, ChromaDB, FAISS','RAG pipeline: ingest → chunk → embed → store → retrieve → generate','Retrieval strategies: MMR, hybrid search, re-ranking (Cohere)','Advanced RAG: HyDE, CRAG, Adaptive RAG, self-querying retriever','LangChain memory: ConversationBufferMemory, SummaryMemory','LangSmith: set up tracing and debugging for all chains','LangChain Academy — complete free certification']},{id:3,name:'AI Agents & LangGraph',dur:'Month 5–6',color:'#a855f7',topics:['Agent fundamentals: ReAct loop — Reason → Act → Observe','Tool calling: @tool decorator, StructuredTool, BaseTool','Built-in tools: Tavily search, Python REPL, SQL agent','Custom tool creation and error handling patterns','LangGraph: StateGraph, nodes, edges, conditional routing','LangGraph checkpointers: save and resume agent state','Human-in-the-loop: interrupt, approve, modify plans','Multi-agent: supervisor pattern, hierarchical orchestration','CrewAI: role-based multi-agent systems','MCP (Model Context Protocol) — new standard for tool integration','Streaming agent state for real-time UI updates','RAGAS: faithfulness, answer relevancy, context precision metrics','LangFuse: open-source LLM observability — set up monitoring','A/B testing prompts, regression testing pipelines','Guardrails: prompt injection defense, content filtering']},{id:4,name:'Fine-Tuning & HuggingFace',dur:'Month 7–8',color:'#f97316',topics:['HuggingFace transformers: AutoTokenizer, AutoModelForCausalLM','HuggingFace datasets: loading, preprocessing, tokenizing','Trainer API: TrainingArguments, compute_metrics, callbacks','HuggingFace Hub: upload models, create model cards','PEFT library: get_peft_model(), LoraConfig, TaskType','LoRA: low-rank adaptation, r/alpha hyperparameters explained','QLoRA: 4-bit quantization + LoRA on free Colab T4 GPU','Unsloth: 2x faster QLoRA, Llama/Mistral/Phi support','Instruction tuning: alpaca format, ShareGPT format datasets','DPO (Direct Preference Optimization) fundamentals','Model evaluation: perplexity, ROUGE, BERTScore before/after','Axolotl: production fine-tuning with YAML configuration','vLLM: high-throughput LLM serving with PagedAttention','Ollama: convert fine-tuned models to GGUF for local serving','Published fine-tuned model on HuggingFace Hub']},{id:5,name:'Generative AI Deep Dive',dur:'Month 9–10',color:'#1b3a6b',topics:['Transformer: Q, K, V matrices — attention score computation','Multi-head attention: parallel heads, concatenation, projection','Positional encoding: sinusoidal vs RoPE (LLaMA) vs ALiBi','Encoder-only (BERT) vs decoder-only (GPT) vs T5 architecture','Layer norm (Pre-LN vs Post-LN), residual connections, FFN','KV-cache: critical for fast auto-regressive inference','Flash Attention, sliding window attention, mixture of experts','Autoregressive LLMs: temperature, top-p, top-k sampling','Diffusion models: forward/reverse process, noise schedules','Stable Diffusion: VAE + U-Net denoiser + CLIP conditioning','Multimodal models: LLaVA, GPT-4V — vision encoder + LLM','Pre-training vs fine-tuning vs in-context learning tradeoffs','Chinchilla scaling laws: compute-optimal data/parameter ratio','Mixed precision training: FP16, BF16, gradient scaling','RLHF: reward model, PPO, DPO — conceptual understanding','Karpathy "Neural Networks: Zero to Hero" series — completed']},{id:6,name:'MLOps & Interview Prep',dur:'Month 11–12',color:'#16a34a',topics:['MLflow: experiment tracking, model registry, artifact logging','Weights & Biases: sweeps, artifact tracking, team collab','vLLM production: batching, concurrency, throughput tuning','BentoML: package ML models as scalable APIs','AWS SageMaker: managed endpoints, auto-scaling, A/B tests','Kubernetes basics for ML: pods, HPA, GPU node selectors','Semantic caching: Redis / GPTCache — reduce API costs 40-60%','CI/CD for ML: GitHub Actions for training and deployment','Data drift: Evidently AI, Alibi Detect — when to retrigger','System design: Production RAG at scale (end-to-end design)','System design: Multi-agent workflow automation system','System design: LLM cost optimization and model routing','LeetCode: 100+ Medium problems solved','10+ mock AI system design interview rounds done','Resume updated: AI projects with quantified metrics','LinkedIn optimized, 6 projects pinned on GitHub','Applied to 20+ AI Engineer and LLM Engineer roles']}];
+
+const PROJECTS=[{id:1,name:'Sentiment Classifier API',color:'#3b82f6',stack:'PyTorch • FastAPI • Docker • Scikit-learn',tasks:['Set up Python ML environment: PyTorch, scikit-learn, pandas, Jupyter','Download Amazon Reviews dataset from Kaggle','Preprocess text: tokenization, lowercasing, stopword removal','Train text classifier in PyTorch with full training loop','Evaluate: accuracy, precision, recall, F1 on held-out test set','Wrap model in FastAPI endpoint with /predict route','Write Dockerfile and build container image','Push to Docker Hub with README instructions','Write GitHub README with architecture, results, setup steps']},{id:2,name:'Document Q&A RAG Chatbot',color:'#14b8a6',stack:'LangChain • pgvector • OpenAI API • FastAPI • React',tasks:['Install pgvector extension in your PostgreSQL database','Build document ingestion pipeline: PDF + WebBaseLoader','Implement RecursiveCharacterTextSplitter with tuned chunk size','Generate embeddings and store in pgvector table','Build retrieval chain with LCEL and MMR strategy','Add ConversationBufferMemory for multi-turn chat','Add Cohere re-ranking to improve retrieval precision','Build FastAPI backend with streaming SSE support','Create React chat UI with message history display','Deploy on AWS EC2 with Nginx (reuse your HelpingHouse setup)','Evaluate with RAGAS: faithfulness and answer relevancy scores','Write blog post: "Building a RAG chatbot with PostgreSQL"']},{id:3,name:'HelpingHouse AI Upgrade',color:'#a855f7',stack:'LangChain • pgvector • OpenAI embeddings • React',tasks:['Embed all NGO descriptions using text-embedding-3-small','Store embeddings in pgvector alongside existing NGO table','Build semantic search API: natural language → matching NGOs','Add /search endpoint to existing Node.js backend','Integrate search UI into HelpingHouse React frontend','Add LangSmith tracing for monitoring search quality','Deploy updated version to existing EC2 instance','Add "AI-powered search" badge to project README']},{id:4,name:'Multi-Agent Research System',color:'#f97316',stack:'LangGraph • LangChain • Tavily • LangSmith • FastAPI',tasks:['Design agent architecture: supervisor + 3 specialist agents','Build Web Search Agent with Tavily tool','Build Document Analysis Agent (reuse RAG from Project 2)','Build Summarization Agent with source citation tracking','Implement supervisor StateGraph with conditional routing','Add human-in-the-loop approval for final report','Set up full LangSmith tracing across all agents','Build streaming FastAPI endpoint with SSE','Create React UI with real-time agent status display','RAGAS evaluation on output quality','Deploy on EC2, add demo GIF to GitHub README']},{id:5,name:'Domain Fine-Tuned LLM',color:'#16a34a',stack:'QLoRA • Unsloth • HuggingFace • Axolotl • vLLM',tasks:['Choose domain: fintech or HRMS (leverage your Wipro experience)','Curate 1000+ instruction-response pairs in alpaca format','Configure QLoRA with Unsloth in Google Colab notebook','Fine-tune Llama 3.2 3B with LoRA adapters (r=16)','Track training with Weights & Biases integration','Evaluate: perplexity, ROUGE-L before and after fine-tuning','Merge LoRA adapters into base model weights','Convert to GGUF format and test locally with Ollama','Upload model + detailed model card to HuggingFace Hub','Deploy vLLM inference server on EC2 small instance','Document: dataset curation, hyperparameters, eval results']},{id:6,name:'Multimodal AI Application',color:'#f59e0b',stack:'GPT-4V • Stable Diffusion • LangChain • FastAPI • React',tasks:['Build image Q&A API using GPT-4V (vision + text)','Integrate RAG chatbot from Project 2 alongside image input','Add Stable Diffusion image generation via HuggingFace API','Build multimodal LangChain chain: text + vision routing','Set up LangSmith observability for all modalities','Create polished React UI with image upload + chat','Evaluate hallucination rate on visual Q&A benchmark','Deploy on AWS EC2 with updated Nginx configuration','Record demo video and add to GitHub README','Write LinkedIn post about the complete AI portfolio']}];
+
+const FLASHCARDS=[{q:'What is RAG?',a:'Retrieval-Augmented Generation — augment LLM context with relevant documents from a vector database before generating. Dramatically reduces hallucinations on domain-specific questions.',cat:'RAG'},{q:'What is the RAG pipeline sequence?',a:'Ingest → Chunk → Embed → Store in vector DB → Query → Retrieve top-k chunks → Augment prompt with chunks → Generate with LLM',cat:'RAG'},{q:'What is a vector embedding?',a:'A numerical list (e.g., 1536 floats) representing text meaning. Similar texts have vectors close together in high-dimensional space, enabling semantic search.',cat:'RAG'},{q:'What is HyDE in RAG?',a:'Hypothetical Document Embeddings — generate a fake ideal answer using LLM, then use that as the search query. Improves recall when real queries are short or vague.',cat:'RAG'},{q:'What is MMR retrieval?',a:'Maximal Marginal Relevance — balances relevance AND diversity in retrieved chunks. Avoids returning 5 nearly identical chunks by penalizing redundancy.',cat:'RAG'},{q:'What is a cross-encoder re-ranker?',a:'A model that re-scores each retrieved chunk with the full query context. Much more accurate than cosine similarity. Cohere Rerank improves precision by 20-40%.',cat:'RAG'},{q:'What is hybrid search?',a:'Combining BM25 (keyword) + semantic vector search. Captures both exact matches and semantic meaning. Consistently outperforms either method alone in production.',cat:'RAG'},{q:'pgvector vs Pinecone?',a:'pgvector: free, use your existing PostgreSQL, good for <10M vectors. Pinecone: managed, scales to billions of vectors, easier ops but costs money.',cat:'RAG'},{q:'What is RAGAS faithfulness?',a:'Measures if the generated answer is factually grounded in retrieved context. Score 0-1 (1 = fully faithful). Key metric for detecting hallucinations in RAG systems.',cat:'RAG'},{q:'What is chunk overlap?',a:'Overlapping tokens between adjacent chunks (e.g., 200 tokens). Prevents important information from being cut at boundaries. Typical: chunk_size=1000, overlap=200.',cat:'RAG'},{q:'What is LCEL?',a:'LangChain Expression Language — compose chains with the | pipe operator. Automatically enables streaming, batching, parallel execution, and unified LangSmith tracing.',cat:'LangChain'},{q:'What does RunnablePassthrough do?',a:'Passes the original input unchanged through a chain step. Used to forward the query alongside retrieved context into the prompt template simultaneously.',cat:'LangChain'},{q:'What is a PromptTemplate?',a:'A reusable prompt with variables filled at runtime. e.g., "Answer: {question} using context: {context}". Enables prompt versioning and systematic testing.',cat:'LangChain'},{q:'What is ConversationSummaryMemory?',a:'Summarizes old conversation turns using an LLM instead of keeping full history. Prevents context overflow for long conversations. Trade-off: some detail lost.',cat:'LangChain'},{q:'What is LangSmith used for?',a:'LLM app observability — logs every chain/tool/LLM call with latency, tokens, cost. Enables automated evaluation, regression testing, and prompt comparison.',cat:'LangChain'},{q:'What is PydanticOutputParser?',a:'Forces LLM to output JSON matching a Pydantic model schema. Returns structured Python objects. Essential for production — never parse LLM text with regex.',cat:'LangChain'},{q:'What is RecursiveCharacterTextSplitter?',a:'Splits text trying paragraph → sentence → word boundaries recursively. Preserves semantic coherence better than fixed-size splitting. Most reliable for RAG.',cat:'LangChain'},{q:'What is the ReAct pattern?',a:'Reason + Act — agent alternates between Thought (reasoning) and Action (tool call) + Observation (tool result) in a loop until reaching a final answer.',cat:'Agents'},{q:'What is LangGraph StateGraph?',a:'A graph where nodes are functions that modify a shared state dict, and edges define transitions. Enables complex stateful workflows with branching, loops, and human approval.',cat:'Agents'},{q:'What is human-in-the-loop?',a:'Pausing agent execution to get human approval before high-stakes actions. Critical for: sending emails, deleting data, making purchases, publishing content.',cat:'Agents'},{q:'What is MCP?',a:'Model Context Protocol — Anthropic open standard for connecting LLMs to tools and data sources. Becoming the 2026 standard for agent tool integration.',cat:'Agents'},{q:'What is the supervisor pattern?',a:'One supervisor agent routes tasks to specialized worker agents (web search, code execution, RAG). Supervisor aggregates results and decides what to call next.',cat:'Agents'},{q:'What is Tavily?',a:'A search API optimized for AI agents. Returns clean, structured results without HTML noise. Superior to SerpAPI for RAG + agent use cases.',cat:'Agents'},{q:'What is multi-agent orchestration?',a:'Multiple specialized agents collaborating on a task. Each handles its expertise. LangGraph StateGraph manages state and routing between agents.',cat:'Agents'},{q:'What are agent tool calling requirements?',a:'Tools need: name, description (LLM reads this!), input schema. The description quality directly determines if the LLM calls the right tool at the right time.',cat:'Agents'},{q:'What is LoRA?',a:'Low-Rank Adaptation — inject small trainable rank-decomposition matrices into attention layers instead of fine-tuning all weights. Reduces trainable params by ~10,000x.',cat:'Fine-Tuning'},{q:'What is QLoRA?',a:'Quantized LoRA — load base model in 4-bit precision, apply LoRA adapters. Fine-tune a 7B model on a free Colab T4 GPU. Used by Unsloth for 2x speed.',cat:'Fine-Tuning'},{q:'What does LoRA rank (r) control?',a:'Dimensionality of the low-rank decomposition. Higher r = more parameters = more capacity. Start with r=16. Use r=64 only for complex domains.',cat:'Fine-Tuning'},{q:'What is instruction tuning?',a:'Fine-tuning on instruction-response pairs to make base LLMs follow directions. The model learns: "when asked X in this format, respond like Y."',cat:'Fine-Tuning'},{q:'What is DPO?',a:'Direct Preference Optimization — train directly on (chosen, rejected) response pairs. No separate reward model needed. Simpler and more stable than RLHF/PPO.',cat:'Fine-Tuning'},{q:'What is Unsloth?',a:'Library making QLoRA fine-tuning 2x faster and 70% less memory. Supports Llama 3.2, Mistral, Phi. Best choice for free Colab GPU fine-tuning.',cat:'Fine-Tuning'},{q:'What is perplexity in LLM eval?',a:'How "surprised" the model is by test text. Lower = model understands the domain better. Always compare before/after fine-tuning on the same test set.',cat:'Fine-Tuning'},{q:'What is vLLM?',a:'High-throughput LLM serving using PagedAttention. 10-24x higher throughput vs naive serving. The production standard for self-hosted open-source LLMs in 2026.',cat:'Fine-Tuning'},{q:'What are Q, K, V in attention?',a:'Query, Key, Value. Each token generates all three. Score = softmax(QKᵀ/√d_k). Values are weighted by scores and summed to produce the attention output.',cat:'GenAI'},{q:'What is multi-head attention?',a:'Run attention in parallel across h heads, each with different learned projections. Each head captures different relationship types. Outputs concatenated and projected.',cat:'GenAI'},{q:'What is RoPE encoding?',a:'Rotary Position Embedding — encodes position by rotating Q and K vectors. Used in LLaMA, Mistral. Generalizes better to long contexts than sinusoidal encoding.',cat:'GenAI'},{q:'What is KV-cache?',a:'Cache Key and Value matrices of processed tokens to avoid recomputation. Critical for fast inference — reduces complexity from O(n²) to O(n) per new token.',cat:'GenAI'},{q:'What is Flash Attention?',a:'Memory-efficient attention that tiles computation to avoid materializing the full NxN attention matrix in HBM. Enables longer contexts and faster training/inference.',cat:'GenAI'},{q:'What is temperature in LLM sampling?',a:'Controls randomness. 0 = deterministic. 1 = normal. >1 = creative/random. For factual RAG: 0-0.3. For creative writing: 0.7-1.0. >1 often gibberish.',cat:'GenAI'},{q:'What is a diffusion model?',a:'Learns to reverse a gradual noise-adding process. Training: add noise to images. Inference: start from pure noise, iteratively denoise to generate. e.g., Stable Diffusion.',cat:'GenAI'},{q:'What is RLHF?',a:'Reinforcement Learning from Human Feedback. Train a reward model on human preference pairs, then optimize the LLM with PPO to maximize reward. Used in ChatGPT, Claude.',cat:'GenAI'},{q:'What are Chinchilla scaling laws?',a:'Optimal model: scale data and parameters equally. Rule: N tokens per parameter for optimal training. Most early models (GPT-3) were undertrained relative to compute budget.',cat:'GenAI'},{q:'What is model drift?',a:'Performance degrades over time because real-world data distribution shifts from training data. Monitor with Evidently AI. Trigger retraining when metrics degrade past threshold.',cat:'MLOps'},{q:'What is semantic caching?',a:'Return cached LLM responses for semantically similar queries (not exact match). GPTCache implements this. Can reduce LLM API costs by 40-60% in production.',cat:'MLOps'},{q:'What is MLflow for?',a:'Experiment tracking (log params, metrics, artifacts), model registry (version + compare models), and model serving. Open source, works with PyTorch, scikit-learn, LangChain.',cat:'MLOps'},{q:'How to handle LLM API failures in production?',a:'Retry with exponential backoff (tenacity library), fallback model chain (OpenAI → Anthropic → Ollama), circuit breaker pattern, cache recent responses for resilience.',cat:'MLOps'},{q:'RAG vs Fine-tuning: when to choose?',a:'RAG: dynamic knowledge, needs citations, data changes frequently, domain is large. Fine-tuning: consistent style/tone, latency critical, proprietary behavior. Use both for best results.',cat:'Interview'},{q:'How do you reduce LLM hallucinations?',a:'RAG with faithful retrieval, low temperature (0-0.3), RAGAS faithfulness monitoring, source citation requirements, self-consistency sampling, output validation guardrails.',cat:'Interview'},{q:'How do you manage context window limits?',a:'RAG to retrieve only relevant chunks, conversation summary memory, sliding window for old turns, map-reduce for long documents, hierarchical summarization.',cat:'Interview'},{q:'Explain your approach to prompt versioning',a:'Store prompts in Git or LangSmith Hub. A/B test versions with RAGAS metrics on evaluation dataset. Never deploy untested prompts. Track which version generated each output.',cat:'Interview'},{q:'How do you make LLM responses faster?',a:'Stream tokens immediately (SSE), semantic caching, route simple queries to cheaper/faster models (GPT-4o-mini), async requests, KV-cache optimization, speculative decoding.',cat:'Interview'},{q:'What is your LLM cost optimization strategy?',a:'Track tokens per request with LangSmith. Route queries by complexity (classify then route). Cache similar queries semantically. Use smaller models for simpler tasks. Batch where possible.',cat:'Interview'}];
+
+const RESOURCES=[{phase:1,color:'#3b82f6',name:'fast.ai — Practical Deep Learning for Coders',url:'https://course.fast.ai',cost:'Free'},{phase:1,color:'#3b82f6',name:'3Blue1Brown — Neural Networks playlist',url:'https://www.youtube.com/playlist?list=PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi',cost:'Free'},{phase:1,color:'#3b82f6',name:'CS229 Machine Learning — Andrew Ng',url:'https://www.coursera.org/learn/machine-learning',cost:'Free audit'},{phase:1,color:'#3b82f6',name:'PyTorch Official Tutorials',url:'https://pytorch.org/tutorials/',cost:'Free'},{phase:1,color:'#3b82f6',name:'Kaggle Learn — Intro to ML + Pandas',url:'https://www.kaggle.com/learn',cost:'Free'},{phase:2,color:'#14b8a6',name:'LangChain Academy (Official Free Cert)',url:'https://academy.langchain.com',cost:'Free'},{phase:2,color:'#14b8a6',name:'DeepLearning.AI Short Courses (4 LangChain courses)',url:'https://www.deeplearning.ai/short-courses/',cost:'Free'},{phase:2,color:'#14b8a6',name:'LangChain Python Documentation',url:'https://python.langchain.com/docs/',cost:'Free'},{phase:2,color:'#14b8a6',name:'IBM: Fundamentals of AI Agents using RAG',url:'https://www.coursera.org/learn/fundamentals-of-ai-agents-using-rag-and-langchain',cost:'Free audit'},{phase:2,color:'#14b8a6',name:'Pinecone Learning Center — Vector DB fundamentals',url:'https://www.pinecone.io/learn/',cost:'Free'},{phase:3,color:'#a855f7',name:'LangGraph Official Documentation',url:'https://langchain-ai.github.io/langgraph/',cost:'Free'},{phase:3,color:'#a855f7',name:'DeepLearning.AI — AI Agents in LangGraph',url:'https://www.deeplearning.ai/short-courses/ai-agents-in-langgraph/',cost:'Free'},{phase:3,color:'#a855f7',name:'Udemy: LLM Engineering — Master AI & Agents (2026)',url:'https://www.udemy.com/course/llm-engineering-master-ai-and-large-language-models/',cost:'~₹600'},{phase:3,color:'#a855f7',name:'RAGAS Evaluation Framework',url:'https://docs.ragas.io',cost:'Free'},{phase:3,color:'#a855f7',name:'LangSmith Documentation',url:'https://docs.smith.langchain.com',cost:'Free'},{phase:4,color:'#f97316',name:'HuggingFace NLP Course (Chapters 1–7)',url:'https://huggingface.co/learn/nlp-course',cost:'Free'},{phase:4,color:'#f97316',name:'DeepLearning.AI — Finetuning Large Language Models',url:'https://www.deeplearning.ai/short-courses/finetuning-large-language-models/',cost:'Free'},{phase:4,color:'#f97316',name:'Unsloth QLoRA Notebooks (GitHub)',url:'https://github.com/unslothai/unsloth',cost:'Free'},{phase:4,color:'#f97316',name:'Google Colab — Free T4 GPU',url:'https://colab.research.google.com',cost:'Free'},{phase:4,color:'#f97316',name:'Kaggle Notebooks — 30 hrs/week free GPU',url:'https://www.kaggle.com/code',cost:'Free'},{phase:5,color:'#1b3a6b',name:'Andrej Karpathy — Neural Networks: Zero to Hero',url:'https://karpathy.ai/zero-to-hero.html',cost:'Free'},{phase:5,color:'#1b3a6b',name:'Attention Is All You Need (Original Paper)',url:'https://arxiv.org/abs/1706.03762',cost:'Free'},{phase:5,color:'#1b3a6b',name:'fast.ai Part 2 — Diffusion & Deep Learning Foundations',url:'https://course.fast.ai/Lessons/part2.html',cost:'Free'},{phase:5,color:'#1b3a6b',name:'HuggingFace Diffusers Documentation',url:'https://huggingface.co/docs/diffusers/',cost:'Free'},{phase:6,color:'#16a34a',name:'Made with ML — MLOps Course (free)',url:'https://madewithml.com',cost:'Free'},{phase:6,color:'#16a34a',name:'LeetCode — Top Interview 150',url:'https://leetcode.com/studyplan/top-interview-150/',cost:'Free'},{phase:6,color:'#16a34a',name:'AWS SageMaker Studio Lab (free GPU)',url:'https://studiolab.sagemaker.aws',cost:'Free'},{phase:6,color:'#16a34a',name:'Full Stack Deep Learning (FSDL)',url:'https://fullstackdeeplearning.com',cost:'Free'},{phase:6,color:'#16a34a',name:'Chip Huyen — AI Engineering Blog',url:'https://huyenchip.com',cost:'Free'}];
+
+const TIPS=['Build in public. Post what you\'re learning on LinkedIn weekly — 50 words + code snippet. Compounds over 6 months.','Use pgvector instead of Pinecone in your RAG projects — you know PostgreSQL and it differentiates you from 90% of candidates.','Every project README needs: problem statement, architecture diagram, demo GIF, setup instructions. Recruiters spend 60 seconds on GitHub.','Add quantified metrics to resume: "Reduced hallucination rate by 35% using RAGAS + re-ranking" beats "Implemented RAG."','Run Ollama locally during dev to avoid API costs. Switch to OpenAI only for production/demos.','LangSmith is free for solo devs. Set it up from day 1. Every project should have full tracing — it\'s your debugging superpower.','Study 2 hours daily consistently > 8 hours on weekends. Your brain consolidates learning during sleep. Consistency beats intensity.','Join LangChain Discord. Answer questions from beginners — teaching is the fastest way to cement your own understanding.','Temperature=0 for factual RAG tasks. Temperature=0.7 for conversational. Common interview question — know the reasoning.','Read one AI paper per week. Start: "Attention Is All You Need" → "RAG" (Lewis 2020) → "LoRA" (Hu 2021).','Async all the way — LLM calls are I/O-bound. Use async/await in FastAPI + LangChain. Common production mistake candidates miss.','The LangChain Academy certificate is free and from the LangChain team itself — the most credible LangChain cert available.','When asked "RAG vs fine-tuning" in interviews, say "It depends" then explain tradeoffs — shows senior-level thinking.','Your HelpingHouse project is an asset. Adding pgvector semantic search = "I built AI features in an existing production app."'];
+
+// ═══════════════════════════════════
+// STATE & STORAGE
+// ═══════════════════════════════════
+let state={phases:{},projects:{},cards:{},streak:0,lastStudied:null,xp:0,totalMinutes:0,notes:{},timerSessions:0,timerLog:[]};
+let sb=null;
+let sbUser=null;
+let saveDebounce=null;
+
+function getLocalConfig(){try{return JSON.parse(localStorage.getItem('sb_config')||'null')}catch{return null}}
+function setLocalConfig(c){localStorage.setItem('sb_config',JSON.stringify(c))}
+function getLocalState(){try{return JSON.parse(localStorage.getItem('yash_state')||'null')}catch{return null}}
+function setLocalState(s){localStorage.setItem('yash_state',JSON.stringify(s))}
+
+async function initApp(){
+  // Load local state first (instant)
+  const ls=getLocalState();
+  if(ls) state={...state,...ls};
+  updateStreak();
+  renderHome();
+  updateTopbar();
+  // Try to init Supabase in background
+  const cfg=getLocalConfig();
+  if(cfg){
+    await initSupabase(cfg.url,cfg.key);
+  }
+}
+
+async function initSupabase(url,key){
+  try{
+    sb=window.supabase.createClient(url,key);
+    const {data:{session}}=await sb.auth.getSession();
+    if(session){
+      sbUser=session.user;
+      setSyncBadge('syncing','⟳ Syncing...');
+      await loadFromCloud();
+      setSyncBadge('synced','✓ Synced');
+      updateAuthModal();
+    } else {
+      setSyncBadge('noauth','☁ Sign in to sync');
+    }
+  }catch(e){
+    setSyncBadge('offline','✕ Offline');
+  }
+}
+
+async function loadFromCloud(){
+  if(!sb||!sbUser) return;
+  try{
+    const {data}=await sb.from('progress').select('state').eq('user_id',sbUser.id).maybeSingle();
+    if(data?.state){
+      const cloud=data.state;
+      // Merge: keep higher XP, merge completed topics
+      state={...state,...cloud,xp:Math.max(state.xp||0,cloud.xp||0)};
+      setLocalState(state);
+      renderHome();
+      updateTopbar();
+    }
+  }catch(e){console.warn('Cloud load failed',e)}
+}
+
+function saveState(){
+  setLocalState(state);
+  updateTopbar();
+  // Debounced cloud save
+  clearTimeout(saveDebounce);
+  saveDebounce=setTimeout(saveToCloud,2000);
+}
+
+async function saveToCloud(){
+  if(!sb||!sbUser) return;
+  setSyncBadge('syncing','⟳ Saving...');
+  try{
+    await sb.from('progress').upsert({user_id:sbUser.id,state,updated_at:new Date().toISOString()});
+    setSyncBadge('synced','✓ Synced');
+  }catch(e){
+    setSyncBadge('offline','✕ Save failed');
+    console.warn('Cloud save failed',e);
+  }
+}
+
+function setSyncBadge(cls,text){
+  const b=document.getElementById('sync-badge');
+  b.className='sync-badge '+cls;
+  b.textContent=text;
+}
+
+// ═══════════════════════════════════
+// AUTH MODAL
+// ═══════════════════════════════════
+let authMode='login';
+
+function openAuthModal(){
+  document.getElementById('auth-modal').style.display='flex';
+  updateAuthModal();
+}
+function closeModal(){document.getElementById('auth-modal').style.display='none'}
+
+function updateAuthModal(){
+  const cfg=getLocalConfig();
+  document.getElementById('step-setup').style.display=!cfg?'block':'none';
+  document.getElementById('step-auth').style.display=(cfg&&!sbUser)?'block':'none';
+  document.getElementById('step-loggedin').style.display=(cfg&&sbUser)?'block':'none';
+  if(sbUser) document.getElementById('loggedin-email').textContent='✓ Syncing as '+sbUser.email;
+}
+
+function switchTab(mode,el){
+  authMode=mode;
+  document.querySelectorAll('.modal-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('auth-btn').textContent=mode==='login'?'Sign In':'Create Account';
+}
+
+async function saveConfig(){
+  const url=document.getElementById('sb-url').value.trim();
+  const key=document.getElementById('sb-key').value.trim();
+  if(!url||!key){alert('Please enter both URL and API key');return}
+  setLocalConfig({url,key});
+  await initSupabase(url,key);
+  updateAuthModal();
+}
+
+async function doAuth(){
+  if(!sb){alert('Supabase not configured');return}
+  const email=document.getElementById('auth-email').value.trim();
+  const pass=document.getElementById('auth-pass').value.trim();
+  if(!email||!pass){showAuthMsg('Please enter email and password','err');return}
+  document.getElementById('auth-btn').textContent='...';
+  try{
+    let res;
+    if(authMode==='login'){
+      res=await sb.auth.signInWithPassword({email,password:pass});
+    } else {
+      res=await sb.auth.signUp({email,password:pass});
+    }
+    if(res.error){showAuthMsg(res.error.message,'err');document.getElementById('auth-btn').textContent=authMode==='login'?'Sign In':'Create Account';return}
+    sbUser=res.data.user||res.data.session?.user;
+    if(!sbUser){showAuthMsg('Check your email to confirm your account, then sign in.','ok');document.getElementById('auth-btn').textContent='Sign In';return}
+    setSyncBadge('syncing','⟳ Syncing...');
+    await loadFromCloud();
+    await saveToCloud();
+    setSyncBadge('synced','✓ Synced');
+    updateAuthModal();
+  }catch(e){showAuthMsg(e.message,'err');document.getElementById('auth-btn').textContent=authMode==='login'?'Sign In':'Create Account'}
+}
+
+function showAuthMsg(msg,type){
+  const el=document.getElementById('auth-msg');
+  el.innerHTML=`<div class="${type==='err'?'err-msg':'ok-msg'}">${msg}</div>`;
+}
+
+async function doSignOut(){
+  if(sb) await sb.auth.signOut();
+  sbUser=null;
+  setSyncBadge('noauth','☁ Sign in to sync');
+  updateAuthModal();
+}
+
+function resetConfig(){
+  localStorage.removeItem('sb_config');
+  sb=null;sbUser=null;
+  updateAuthModal();
+}
+
+// ═══════════════════════════════════
+// STREAK & TOPBAR
+// ═══════════════════════════════════
+function todayStr(){return new Date().toISOString().slice(0,10)}
+function updateStreak(){
+  const today=todayStr();
+  const yesterday=new Date();yesterday.setDate(yesterday.getDate()-1);
+  const yd=yesterday.toISOString().slice(0,10);
+  if(state.lastStudied!==today&&state.lastStudied!==yd) state.streak=state.streak>0?0:state.streak;
+}
+function markStudied(){
+  const today=todayStr();
+  if(state.lastStudied===today) return;
+  const yesterday=new Date();yesterday.setDate(yesterday.getDate()-1);
+  const yd=yesterday.toISOString().slice(0,10);
+  state.streak=(state.lastStudied===yd)?state.streak+1:1;
+  state.lastStudied=today;
+  saveState();
+}
+function updateTopbar(){
+  document.getElementById('tb-streak').textContent=state.streak;
+  document.getElementById('tb-xp').textContent=(state.xp||0).toLocaleString();
+  document.getElementById('tb-hrs').textContent=Math.floor((state.totalMinutes||0)/60);
+  document.getElementById('home-streak').textContent=state.streak;
+  document.getElementById('home-xp').textContent=(state.xp||0).toLocaleString();
+  document.getElementById('home-topics').textContent=countDoneTopics();
+  document.getElementById('home-hrs').textContent=Math.floor((state.totalMinutes||0)/60);
+}
+function countDoneTopics(){let n=0;PHASES.forEach(p=>{const ps=state.phases[p.id]||{};p.topics.forEach((_,i)=>{if(ps[i]==='done')n++;});});return n}
+function totalTopics(){return PHASES.reduce((s,p)=>s+p.topics.length,0)}
+function phasePercent(pid){const p=PHASES.find(x=>x.id===pid);if(!p)return 0;const ps=state.phases[pid]||{};const done=p.topics.filter((_,i)=>ps[i]==='done').length;return Math.round(done/p.topics.length*100)}
+function overallPercent(){const d=countDoneTopics(),t=totalTopics();return t?Math.round(d/t*100):0}
+
+// ═══════════════════════════════════
+// PANEL SWITCHING
+// ═══════════════════════════════════
+function showPanel(id,btn){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='home')renderHome();
+  if(id==='learn')renderPhases();
+  if(id==='flash')initFlash();
+  if(id==='proj')renderProjects();
+  if(id==='timer')renderTimerTopics();
+  if(id==='res')renderResources();
+}
+
+// ═══════════════════════════════════
+// HOME
+// ═══════════════════════════════════
+function renderHome(){
+  updateTopbar();
+  const pct=overallPercent();
+  document.getElementById('home-overall-bar').style.width=pct+'%';
+  document.getElementById('home-overall-pct').textContent=pct+'%';
+  const c=document.getElementById('home-phase-mini');c.innerHTML='';
+  PHASES.forEach(p=>{
+    const pct=phasePercent(p.id);
+    const d=document.createElement('div');d.className='mini-phase';
+    d.innerHTML=`<div class="mini-phase-name" style="color:${p.color}">${p.name}</div><div class="pbar-wrap"><div class="pbar-fill" style="width:${pct}%;background:${p.color}"></div></div><div class="mini-phase-pct">${pct}%</div>`;
+    c.appendChild(d);
+  });
+  let focusHtml='<div style="color:var(--text3)">All done! 🎉</div>';
+  outer:for(const p of PHASES){const ps=state.phases[p.id]||{};for(let i=0;i<p.topics.length;i++){if(ps[i]!=='done'){focusHtml=`<div style="font-size:11px;color:${p.color};font-family:var(--mono);margin-bottom:6px">Phase ${p.id}: ${p.name}</div><div style="font-size:13px;color:var(--text);font-weight:500">${p.topics[i]}</div>`;break outer;}}}
+  document.getElementById('home-focus').innerHTML=focusHtml;
+  const today=todayStr();
+  document.getElementById('notes-ta').value=state.notes[today]||'';
+  document.getElementById('home-tip').textContent=TIPS[new Date().getDate()%TIPS.length];
+}
+function saveNotes(){
+  const today=todayStr();
+  state.notes[today]=document.getElementById('notes-ta').value;
+  markStudied();saveState();
+  const el=document.getElementById('notes-saved');el.textContent='Saved ✓';
+  setTimeout(()=>{el.textContent=''},1500);
+}
+
+// ═══════════════════════════════════
+// PHASES
+// ═══════════════════════════════════
+function renderPhases(){
+  const c=document.getElementById('phases-container');c.innerHTML='';
+  PHASES.forEach(p=>{
+    const pct=phasePercent(p.id);const ps=state.phases[p.id]||{};
+    const topicsHtml=p.topics.map((t,i)=>{
+      const status=ps[i]||'todo';
+      return `<div class="check-item" onclick="cycleTopic(${p.id},${i},this)">
+        <div class="check-box ${status==='done'?'done':status==='learning'?'learning':''}"></div>
+        <div class="check-label ${status==='done'?'done':''}">${t}</div>
+        <span class="badge badge-${status==='done'?'green':status==='learning'?'amber':'blue'}" style="font-size:10px">${status==='done'?'✓ Done':status==='learning'?'◐ In Progress':'○ Todo'}</span>
+      </div>`;
+    }).join('');
+    const div=document.createElement('div');div.className='phase-card';
+    div.innerHTML=`<div class="phase-header" onclick="togglePhase(${p.id})">
+      <div class="phase-num" style="background:${p.color}22;color:${p.color}">${p.id}</div>
+      <div class="phase-meta"><div class="phase-name">${p.name}</div><div class="phase-dur">${p.dur} · ${p.topics.length} topics</div>
+      <div style="margin-top:5px"><div class="pbar-wrap" style="width:160px"><div class="pbar-fill" id="pbar-${p.id}" style="width:${pct}%;background:${p.color}"></div></div></div></div>
+      <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:${p.color}" id="ppct-${p.id}">${pct}%</div>
+      <div class="chevron" id="pchev-${p.id}">▼</div>
+    </div><div class="phase-body" id="pbody-${p.id}">${topicsHtml}</div>`;
+    c.appendChild(div);
+  });
+}
+function togglePhase(id){document.getElementById('pbody-'+id).classList.toggle('open');document.getElementById('pchev-'+id).classList.toggle('open')}
+function cycleTopic(pid,idx,row){
+  if(!state.phases[pid])state.phases[pid]={};
+  const cur=state.phases[pid][idx]||'todo';
+  const next=cur==='todo'?'learning':cur==='learning'?'done':'todo';
+  state.phases[pid][idx]=next;
+  if(next==='done')state.xp=(state.xp||0)+10;
+  else if(cur==='done')state.xp=Math.max(0,(state.xp||0)-10);
+  markStudied();saveState();
+  const box=row.querySelector('.check-box');
+  const lbl=row.querySelector('.check-label');
+  const badge=row.querySelector('.badge');
+  box.className='check-box'+(next==='done'?' done':next==='learning'?' learning':'');
+  lbl.className='check-label'+(next==='done'?' done':'');
+  badge.className=`badge badge-${next==='done'?'green':next==='learning'?'amber':'blue'}`;
+  badge.textContent=next==='done'?'✓ Done':next==='learning'?'◐ In Progress':'○ Todo';
+  const pct=phasePercent(pid);
+  document.getElementById('pbar-'+pid).style.width=pct+'%';
+  document.getElementById('ppct-'+pid).textContent=pct+'%';
+  updateTopbar();
+}
+
+// ═══════════════════════════════════
+// FLASHCARDS
+// ═══════════════════════════════════
+let fcDeck=[...FLASHCARDS.map((_,i)=>i)],fcIdx=0,fcCat='All',fcFlipped=false;
+function initFlash(){renderCats();renderFcProgress();showCard();renderFcStats()}
+function renderCats(){
+  const cats=['All',...new Set(FLASHCARDS.map(c=>c.cat))];
+  document.getElementById('fc-cats').innerHTML=cats.map(cat=>`<div class="fc-cat ${cat===fcCat?'active':''}" onclick="setCat('${cat}')">${cat}</div>`).join('');
+}
+function setCat(cat){fcCat=cat;fcDeck=FLASHCARDS.map((_,i)=>i).filter(i=>cat==='All'||FLASHCARDS[i].cat===cat);fcIdx=0;renderCats();renderFcProgress();showCard()}
+function renderFcProgress(){document.getElementById('fc-progress-row').innerHTML=fcDeck.map(i=>{const r=state.cards[i];return`<div class="fc-pip ${r==='easy'?'mastered':r?'seen':''}"></div>`}).join('')}
+function showCard(){
+  if(!fcDeck.length)return;
+  const i=fcDeck[fcIdx];const card=FLASHCARDS[i];
+  fcFlipped=false;document.getElementById('fc-inner').classList.remove('flipped');
+  document.getElementById('fc-tag').textContent=card.cat;document.getElementById('fc-tag2').textContent=card.cat;
+  document.getElementById('fc-q').textContent=card.q;document.getElementById('fc-a').textContent=card.a;
+  document.getElementById('fc-counter').textContent=`Card ${fcIdx+1} of ${fcDeck.length} · ${fcCat}`;
+  document.getElementById('fc-actions').style.display='none';
+}
+function flipCard(){fcFlipped=!fcFlipped;document.getElementById('fc-inner').classList.toggle('flipped',fcFlipped);document.getElementById('fc-actions').style.display=fcFlipped?'flex':'none';if(fcFlipped)markStudied()}
+function rateCard(r){const i=fcDeck[fcIdx];state.cards[i]=r;if(r==='easy')state.xp=(state.xp||0)+5;else if(r==='good')state.xp=(state.xp||0)+2;saveState();renderFcProgress();renderFcStats();nextCard()}
+function nextCard(){fcIdx=(fcIdx+1)%fcDeck.length;showCard()}
+function prevCard(){fcIdx=(fcIdx-1+fcDeck.length)%fcDeck.length;showCard()}
+function shuffleCards(){for(let i=fcDeck.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[fcDeck[i],fcDeck[j]]=[fcDeck[j],fcDeck[i]]}fcIdx=0;showCard()}
+function renderFcStats(){const r=Object.values(state.cards);document.getElementById('fc-stat-master').textContent=r.filter(x=>x==='easy').length;document.getElementById('fc-stat-good').textContent=r.filter(x=>x==='good').length;document.getElementById('fc-stat-again').textContent=r.filter(x=>x==='again').length}
+
+// ═══════════════════════════════════
+// PROJECTS
+// ═══════════════════════════════════
+function renderProjects(){
+  const c=document.getElementById('proj-container');c.innerHTML='';
+  PROJECTS.forEach(p=>{
+    const ps=state.projects[p.id]||{};
+    const done=p.tasks.filter((_,i)=>ps[i]).length;
+    const pct=Math.round(done/p.tasks.length*100);
+    const div=document.createElement('div');div.className='proj-card';
+    div.innerHTML=`<div class="proj-header" onclick="toggleProj(${p.id})">
+      <div class="proj-num-box" style="background:${p.color}22;color:${p.color}">${p.id}</div>
+      <div class="proj-info"><div class="proj-name">${p.name}</div><div class="proj-stack">${p.stack}</div>
+      <div style="margin-top:5px"><div class="pbar-wrap" style="width:130px"><div class="pbar-fill" id="projbar-${p.id}" style="width:${pct}%;background:${p.color}"></div></div></div></div>
+      <div><div style="font-family:var(--mono);font-weight:700;font-size:13px;color:${p.color}" id="projpct-${p.id}">${pct}%</div><div style="font-size:11px;color:var(--text3);font-family:var(--mono)">${done}/${p.tasks.length}</div></div>
+      <div class="chevron" id="projchev-${p.id}">▼</div>
+    </div>
+    <div class="proj-body" id="projbody-${p.id}">${p.tasks.map((t,i)=>`<div class="proj-task" onclick="toggleTask(${p.id},${i},this)"><div class="check-box ${ps[i]?'done':''}"></div><div class="proj-task-label ${ps[i]?'done':''}">${t}</div></div>`).join('')}</div>`;
+    c.appendChild(div);
+  });
+}
+function toggleProj(id){document.getElementById('projbody-'+id).classList.toggle('open');document.getElementById('projchev-'+id).classList.toggle('open')}
+function toggleTask(pid,idx,row){
+  if(!state.projects[pid])state.projects[pid]={};
+  const cur=state.projects[pid][idx]||false;
+  state.projects[pid][idx]=!cur;
+  if(!cur)state.xp=(state.xp||0)+15;else state.xp=Math.max(0,(state.xp||0)-15);
+  markStudied();saveState();
+  row.querySelector('.check-box').className='check-box'+(!cur?' done':'');
+  row.querySelector('.proj-task-label').className='proj-task-label'+(!cur?' done':'');
+  const p=PROJECTS.find(x=>x.id===pid);const ps=state.projects[pid]||{};
+  const done=p.tasks.filter((_,i)=>ps[i]).length;const pct=Math.round(done/p.tasks.length*100);
+  document.getElementById('projbar-'+pid).style.width=pct+'%';document.getElementById('projpct-'+pid).textContent=pct+'%';
+  updateTopbar();
+}
+
+// ═══════════════════════════════════
+// TIMER
+// ═══════════════════════════════════
+const TMODES={focus:25*60,short:5*60,long:15*60};
+let tMode='focus',tLeft=25*60,tTotal=25*60,tRunning=false,tInterval=null;
+function setTimerMode(m,btn){
+  tMode=m;tLeft=tTotal=TMODES[m];tRunning=false;clearInterval(tInterval);
+  document.querySelectorAll('.timer-mode-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+  document.getElementById('timer-start-btn').textContent='▶ Start';
+  document.getElementById('timer-ring').style.stroke=m==='focus'?'var(--amber)':m==='short'?'var(--teal)':'var(--purple)';
+  updateTimerDisplay();
+}
+function toggleTimer(){
+  if(tRunning){tRunning=false;clearInterval(tInterval);document.getElementById('timer-start-btn').textContent='▶ Start';}
+  else{tRunning=true;document.getElementById('timer-start-btn').textContent='⏸ Pause';
+    tInterval=setInterval(()=>{tLeft--;if(tMode==='focus'){state.totalMinutes=(state.totalMinutes||0)+1;if(state.totalMinutes%5===0)saveState();}updateTimerDisplay();if(tLeft<=0)timerDone();},1000);}
+}
+function timerDone(){
+  tRunning=false;clearInterval(tInterval);document.getElementById('timer-start-btn').textContent='▶ Start';
+  if(tMode==='focus'){
+    state.timerSessions=(state.timerSessions||0)+1;state.xp=(state.xp||0)+20;
+    const topic=document.getElementById('timer-topic-select').value;
+    const now=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+    state.timerLog=([`${now} — ${topic||'Focus'} ✓`,...(state.timerLog||[])]).slice(0,10);
+    markStudied();saveState();
+    document.getElementById('timer-sessions').textContent=(state.timerSessions||0)%4;
+    renderTimerLog();updateTopbar();
+    alert('🎉 Session complete! +20 XP. Take a break!');
+  }
+}
+function resetTimer(){tRunning=false;clearInterval(tInterval);tLeft=tTotal=TMODES[tMode];document.getElementById('timer-start-btn').textContent='▶ Start';updateTimerDisplay()}
+function skipTimer(){tLeft=0;timerDone()}
+function updateTimerDisplay(){
+  const m=String(Math.floor(tLeft/60)).padStart(2,'0'),s=String(tLeft%60).padStart(2,'0');
+  document.getElementById('timer-digits').textContent=`${m}:${s}`;
+  const pct=tLeft/tTotal,circ=2*Math.PI*42;
+  document.getElementById('timer-ring').style.strokeDashoffset=circ*(1-pct);
+  document.getElementById('timer-mode-label').textContent=tMode==='focus'?'FOCUS':tMode==='short'?'BREAK':'LONG BREAK';
+}
+function renderTimerTopics(){
+  document.getElementById('timer-topic-select').innerHTML=PHASES.flatMap(p=>p.topics.map(t=>`<option value="${p.name}: ${t.substring(0,38)}">${p.name}: ${t.substring(0,38)}</option>`)).join('');
+  document.getElementById('timer-sessions').textContent=(state.timerSessions||0)%4;
+  updateTimerDisplay();renderTimerLog();
+}
+function renderTimerLog(){
+  const logs=state.timerLog||[];
+  document.getElementById('timer-log').innerHTML=logs.length?logs.map(l=>`<div>${l}</div>`).join(''):'<div style="color:var(--text3)">No sessions yet</div>';
+}
+
+// ═══════════════════════════════════
+// RESOURCES
+// ═══════════════════════════════════
+function renderResources(){
+  const c=document.getElementById('res-container');
+  const grouped={};RESOURCES.forEach(r=>{if(!grouped[r.phase])grouped[r.phase]=[];grouped[r.phase].push(r);});
+  c.innerHTML=Object.entries(grouped).map(([pid,res])=>{
+    const p=PHASES.find(x=>x.id===+pid);
+    return`<div class="card" style="margin-bottom:12px"><div class="sh" style="color:${p.color}">Phase ${pid} — ${p.name}</div>${res.map(r=>`<div class="res-link"><div class="res-phase-dot" style="background:${r.color}"></div><a href="${r.url}" target="_blank">${r.name}</a><span class="res-cost" style="color:${r.cost==='Free'?'var(--green)':'var(--amber)'}">${r.cost}</span></div>`).join('')}</div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════
+// INIT
+// ═══════════════════════════════════
+initApp();
+</script>
+</body>
+</html>
